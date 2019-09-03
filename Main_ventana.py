@@ -1,8 +1,6 @@
-from multiprocessing import Process, Queue
 import numpy as np
 import PIL
 import cv2
-import imutils
 import time
 import tkinter as tk
 from tkinter import *
@@ -12,7 +10,6 @@ from tkinter.ttk import *
 ###############################################################################################
 face_det=cv2.CascadeClassifier('/usr/share/opencv/lbpcascades/lbpcascade_frontalface.xml')#clasificador pre-entrenado de reconcoimeinto facial
 capflag=0 #bandera de captura de imagen estática
-
 #############################################################################################
         #DETECCIÖN FACIAL
 #############################################################################################   
@@ -122,7 +119,7 @@ def show_frame():
 def capture():
     capflag=1 #actualizando el valor de la bandera de captura a 1 para evitar ejecutar la captura de video
     global imagen, imgtk #se declaran variables globales para poder intercambiar entre video e imagen estática.
-    global run#variable que captura la actulización del lienzo
+    global run#variable que captura la actualización del lienzo
     if run:  
         mainwin.after_cancel(run) #deteniendo el ciclo de actulización
         run=None # reiniciando el valor de "run"
@@ -138,7 +135,7 @@ def capture():
 ##############################################################################################      
 def reint():
     capflag=0 #reiniciando valor de la bandera de captura y permitir la ejecución de la captura de video
-    time.sleep(1.0) #tiempo de espera para la cámara
+    time.sleep(1.0)
     show_frame() #ejecutando nuevamente la captura de video
 ##############################################################################################
      #FUNCIÖN PARA GUARDAR
@@ -158,7 +155,7 @@ def guardar():
     cv2.imwrite(filename, imagen)#guardando la imagen por medio de la función imwrite de OpenCV
     f.close()#cerrando la ventana de dialogo
 ################################################################################################
-    #VETANA DE CONTRASTE
+    #VENTANA DE CONTRASTE
 ################################################################################################    
 def contraste():
     adjcont=tk.Toplevel(mainwin)
@@ -199,7 +196,7 @@ archivo.add_command(label="Salir", command=quit)#agregando botón para salir de 
 ajustes=Menu(menubar, tearoff=0)
 menubar.add_cascade(label="Ajustes", menu=ajustes)
 ajustes.add_command(label="Invertir Color")
-ajustes.add_command(label="Ajustar Contraste", command=contraste))
+ajustes.add_command(label="Ajustar Contraste", command=contraste)
 filtrar=Menu(ajustes, tearoff=0)
 ajustes.add_cascade(label="Filtros", menu=filtrar)
 filtrar.add_command(label="Espaciales")
