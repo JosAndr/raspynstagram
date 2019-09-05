@@ -23,6 +23,9 @@ class App:
         self.faceflag=0
         self.colorflag=0
         self.contrflag=0
+        self.invflag=0
+        self.grayflag=0
+        self.bwflag=0
 #***********************************************************************************************
 ################################################################################################
         #APARTADO GRÁFICO/VISUAL
@@ -54,15 +57,20 @@ class App:
         self.archivo.add_command(label="Guardar", command=self.guardar)#Opción guardar, como comando llama a la función guardar()
         self.archivo.add_separator()#agregando separador
         self.archivo.add_command(label="Salir", command=self.salir)#agregando botón para salir de la GUI
-        #Creando menú de ajustes
+        #Creando menú de mejoramiento
         self.ajustes=Menu(self.menubar, tearoff=0)
-        self.menubar.add_cascade(label="Ajustes", menu=self.ajustes)
-        self.ajustes.add_command(label="Invertir Color")
+        self.menubar.add_cascade(label="Mejoramiento", menu=self.ajustes)
         self.ajustes.add_command(label="Ajustar Contraste",command=self.contraste)
         self.detec=Menu(self.ajustes, tearoff=0)
         self.ajustes.add_cascade(label="Detección", menu=self.detec)
         self.detec.add_command(label="Detección Facial: NO",command=self.faceon)
         self.detec.add_command(label="Detección de Color: NO",command=self.coloron)
+        #Menu de color
+        self.color=Menu(self.menubar,tearoff=0)
+        self.menubar.add_cascade(label="Color", menu=self.color)
+        self.color.add_command(label="Invertir Color",command=self.inv)
+        self.color.add_command(label="Escala de Grises",command=self.gray)
+        self.color.add_command(label="Blanco y negro",command=self.bw)
 ###############################################################################################
     #CREANDO BOTONES PARA INTERACTUAR CON LA VISUALIZACIÓN DE LA IMAGEN
 ###############################################################################################        
@@ -92,7 +100,7 @@ class App:
         self.cont=DoubleVar()
         self.adjcont.title("Contraste")
         self.adjcont.geometry("300x100+670+20")
-        self.slider=tk.Scale(self.adjcont,from_=0, to=3, cursor="arrow", orient=HORIZONTAL,resolution=0.01, variable=self.cont,length=300,command=self.conts)
+        self.slider=tk.Scale(self.adjcont,from_=0.001, to=3, cursor="arrow", orient=HORIZONTAL,resolution=0.001,showvalue=NO, variable=self.cont,length=300,command=self.conts)
         self.slider.set(1)
         self.slider.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
         self.adjcont.protocol("WM_DELETE_WINDOW", self.closecont)
@@ -108,18 +116,16 @@ class App:
     def detc_facial(self):
         self.face_det=cv2.CascadeClassifier('/usr/share/opencv/lbpcascades/lbpcascade_frontalface.xml')#clasificador pre-entrenado de reconcoimeinto facial
         self.imnoroi=cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB
-        self.gris = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2GRAY)#Convirtiendo de BGR a escala de grises
+        self.gris=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
         self.faces = self.face_det.detectMultiScale( #función de detección 
         self.gris,     
         scaleFactor=1.2,
         minNeighbors=5,     
         minSize=(20, 20)
         )
-        #####################################################################################
         #dibujando rectángulos sobre los rostros detectados
         for (x,y,w,h) in self.faces:
             cv2.rectangle(self.imagen,(x,y),(x+w,y+h),(255,255,255),2) #definiendo rectángulo para las ROI
-            self.roi_gray = self.gris[y:y+h, x:x+w]#dibujando ROI sobre la imagen en escala de grises
             self.roi_color = self.imagen[y:y+h, x:x+w] #dibujando ROI sobre la imagen BGR
 #############################################################################################
     #FUNCION PARA ACTIVAR/DESACTIVAR DETECCIÖN FACIAL
@@ -210,39 +216,34 @@ class App:
   #FUNCIÓN DE ACTUALIZACIÓN
 ##############################################################################################        
     def actualizar(self):
+        ret,frame, frame1=self.VS.get_frame() #llamando la función de obtención de imagen
+        self.imagen=cv2.flip(frame, 1)#invirtiendo para que la imagen coincida con la imagen real
+        if ret:#si hay "frames" capturados
+            if self.faceflag==1:
+                self.detc_facial()
+            if self.colorflag==1:
+                self.detc_color()
+            if self.contrflag==1:
+                self.conts(1)
+            if self.invflag==1:
+                self.imagen=cv2.bitwise_not(self.imagen)
+            if self.grayflag==1:
+                self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
+            if self.bwflag==1:
+                self.grisesc=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY).astype('uint8')
+                self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+            self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
+            self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
+            self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
+            self.lmain.configure(image=self.imgtk)#definiendo fuente de la imagen del lienzo
+            self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
+
         if self.run==0:#modo por defecto:visualización de video
-            ret,frame, frame1=self.VS.get_frame() #llamando la función de obtención de imagen
-            self.imagen=cv2.flip(frame, 1)#invirtiendo para que la imagen coincida con la imagen real
-            if ret:#si hay "frames" capturados
-                if self.faceflag==1:
-                    self.detc_facial()
-                if self.colorflag==1:
-                    self.detc_color()
-                if self.contrflag==1:
-                    self.conts(1)
-                self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
-                self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
-                self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
-                self.lmain.configure(image=self.imgtk)#definiendo fuente de la imagen del lienzo
-                self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
             self.lmain.after(1,self.actualizar)#reiniciando la función despues de 1 ms
             
         if self.run==1:#modo forzado:imagen estática
-           ret,frame, frame1=self.VS.get_frame()
-           self.imagen= cv2.flip(frame, 1) #invirtiendo para que la imagen coincida con la imagen real
-           if ret:#si hay "frames" capturados
-                if self.faceflag==1:
-                    self.detc_facial()
-                if self.colorflag==1:
-                    self.detc_color()
-                if self.contrflag==1:
-                    self.conts(1)
-                self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
-                self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
-                self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
-                self.lmain.configure(image=self.imgtk)#definiendo fuente de la imagen del lienzo
-                self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
-                #no es necesaria función de actualización pues se quiere mantener el último "frmae" capturado estático
+            pass
+           
 ##############################################################################################
    #FUNCIONES PARA EL CAMBIO DE MODO ACTUALIZACIÓN
 ##############################################################################################   
@@ -286,6 +287,30 @@ class App:
         self.table=np.array([((self.i / 255.0) ** self.invgamma) * 255
 		for self.i in np.arange(0, 256)]).astype("uint8")
         self.imagen=cv2.LUT(self.imagen,self.table)
+##############################################################################################
+   #INVERTIR COLOR
+##############################################################################################     
+    def inv(self):
+        if self.invflag==0:
+            self.invflag=1
+        elif self.invflag==1:
+            self.invflag=0
+##############################################################################################
+  #ESCALA DE GRISES
+##############################################################################################     
+    def gray(self):
+        if self.grayflag==0:
+            self.grayflag=1
+        elif self.grayflag==1:
+            self.grayflag=0
+##############################################################################################
+  #B&W
+##############################################################################################     
+    def bw(self):
+        if self.bwflag==0:
+            self.bwflag=1
+        elif self.bwflag==1:
+            self.bwflag=0  
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 ################################################################################################
