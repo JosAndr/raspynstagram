@@ -25,6 +25,8 @@ class App:
         self.invflag=0
         self.grayflag=0
         self.bwflag=0
+        self.smoothflag=0
+        self.cartoonflag=0
 #***********************************************************************************************
 ################################################################################################
         #APARTADO GRÁFICO/VISUAL
@@ -56,20 +58,23 @@ class App:
         self.archivo.add_command(label="Guardar", command=self.guardar)#Opción guardar, como comando llama a la función guardar()
         self.archivo.add_separator()#agregando separador
         self.archivo.add_command(label="Salir", command=self.salir)#agregando botón para salir de la GUI
+        #Menu de detección
+        self.deteccion=Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Detección", menu=self.deteccion)
+        self.deteccion.add_command(label="Detección Facial: NO",command=self.faceon)
+        self.deteccion.add_command(label="Detección de Color: NO",command=self.coloron)
         #Creando menú de mejoramiento
         self.ajustes=Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Mejoramiento", menu=self.ajustes)
-        self.ajustes.add_command(label="Ajustar Contraste",command=self.contraste)
-        self.detec=Menu(self.ajustes, tearoff=0)
-        self.ajustes.add_cascade(label="Detección", menu=self.detec)
-        self.detec.add_command(label="Detección Facial: NO",command=self.faceon)
-        self.detec.add_command(label="Detección de Color: NO",command=self.coloron)
+        self.ajustes.add_command(label="Contraste",command=self.contraste)
+        self.ajustes.add_command(label="Suavizar",command=self.smooth)
         #Menu de color
         self.color=Menu(self.menubar,tearoff=0)
         self.menubar.add_cascade(label="Color", menu=self.color)
         self.color.add_command(label="Invertir Color",command=self.inv)
         self.color.add_command(label="Escala de Grises",command=self.gray)
         self.color.add_command(label="Blanco y negro",command=self.bw)
+        self.color.add_command(label="Caricatura",command=self.cartoon_on)
 ###############################################################################################
     #CREANDO BOTONES PARA INTERACTUAR CON LA VISUALIZACIÓN DE LA IMAGEN
 ###############################################################################################        
@@ -90,6 +95,7 @@ class App:
         time.sleep(2.0)
         self.actualizar()
         self.mainwin.mainloop()
+#-----------------------------------------------------------------------------------------------------------
 ################################################################################################
     #VENTANA DE CONTRASTE
 ################################################################################################    
@@ -103,6 +109,32 @@ class App:
         self.slider.set(1)
         self.slider.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
         self.adjcont.protocol("WM_DELETE_WINDOW", self.closecont)
+##############################################################################################
+   #FUNCIÓN PARA CERRAR VENTANA DE CONTRASTE
+##############################################################################################        
+    def closecont(self):
+        self.contrflag=0
+        self.adjcont.destroy()
+#-----------------------------------------------------------------------------------------------------------
+################################################################################################
+    #VENTANA DE SUAVIZADO
+################################################################################################    
+    def smooth(self):
+        self.smoothflag=1
+        self.suavizar=tk.Toplevel(self.mainwin)
+        self.smth=1
+        self.suavizar.title("Suavizado")
+        self.suavizar.geometry("300x100+670+20")
+        self.sigsli=tk.Scale(self.suavizar,from_=1, to=15, cursor="arrow", orient=HORIZONTAL,showvalue=YES, variable=self.smth,length=300,command=self.suaval)
+        self.sigsli.set(1)
+        self.sigsli.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
+        self.suavizar.protocol("WM_DELETE_WINDOW", self.closesuav)
+##############################################################################################
+   #FUNCIÓN PARA CERRAR VENTANA DE SUAVIZADO
+##############################################################################################        
+    def closesuav(self):
+        self.smoothflag=0
+        self.suavizar.destroy()        
 #********************************************************************************************
 #############################################################################################
     #CALLBACKS Y FUCIONES
@@ -132,10 +164,10 @@ class App:
     def faceon(self):
         if self.faceflag==0:
             self.faceflag=1
-            self.detec.entryconfig(0,label="Detección Facial: SI")
+            self.deteccion.entryconfig(0,label="Detección Facial: SI")
         elif self.faceflag==1:
             self.faceflag=0
-            self.detec.entryconfig(0,label="Detección Facial: NO")
+            self.deteccion.entryconfig(0,label="Detección Facial: NO")
 #############################################################################################
          #DETECCIÖN DE COLOR
 #############################################################################################
@@ -207,10 +239,10 @@ class App:
     def coloron(self):
         if self.colorflag==0:
             self.colorflag=1
-            self.detec.entryconfig(1,label="Detección de Color: SI")
+            self.deteccion.entryconfig(1,label="Detección de Color: SI")
         elif self.colorflag==1:
             self.colorflag=0
-            self.detec.entryconfig(1,label="Detección de Color: NO")                
+            self.deteccion.entryconfig(1,label="Detección de Color: NO")                
 ##############################################################################################
   #FUNCIÓN DE ACTUALIZACIÓN
 ##############################################################################################        
@@ -220,17 +252,28 @@ class App:
         if ret:#si hay "frames" capturados
             if self.faceflag==1:
                 self.detc_facial()
+                #..............................................................
             if self.colorflag==1:
                 self.detc_color()
+                #..............................................................
             if self.contrflag==1:
                 self.conts(1)
+                #..............................................................
+            if  self.smoothflag==1:
+                self.suaval(1)
+                #.............................................................
             if self.invflag==1:
                 self.imagen=cv2.bitwise_not(self.imagen)
+                #.............................................................
             if self.grayflag==1:
                 self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
+                #.............................................................
             if self.bwflag==1:
                 self.grisesc=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY).astype('uint8')
                 self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+                #........................................................................................................
+            if self.cartoonflag==1:
+                self.cartoon()
             self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
             self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
             self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
@@ -256,12 +299,7 @@ class App:
 ##############################################################################################        
     def salir(self):
         self.mainwin.destroy()
-##############################################################################################
-   #FUNCIÓN PARA CERRAR VENTANA DE CONTRASTE
-##############################################################################################        
-    def closecont(self):
-        self.contrflag=0
-        self.adjcont.destroy()
+
 ##############################################################################################
    #FUNCIÓN PARA GUARDAR
 ##############################################################################################
@@ -287,6 +325,15 @@ class App:
 		for self.i in np.arange(0, 256)]).astype("uint8")
         self.imagen=cv2.LUT(self.imagen,self.table)
 ##############################################################################################
+   #FUNCIÓN PARA SUAVIZAR
+##############################################################################################     
+    def suaval(self,sigma):
+        self.scolor=self.imagen
+        self.iter=self.sigsli.get()
+        for _ in range(self.iter):
+            self.scolor=cv2.bilateralFilter(self.scolor,3,3,1)
+        self.imagen=self.scolor
+##############################################################################################
    #INVERTIR COLOR
 ##############################################################################################     
     def inv(self):
@@ -309,7 +356,34 @@ class App:
         if self.bwflag==0:
             self.bwflag=1
         elif self.bwflag==1:
-            self.bwflag=0  
+            self.bwflag=0
+##############################################################################################
+  #CARICATURA
+##############################################################################################     
+    def cartoon(self):
+       self.color=self.imagen
+       self.down=2
+       self.bildif=7
+       for _ in range(self.down):
+           self.color=cv2.pyrDown(self.color)
+       for _ in range(self.bildif):
+           self.color=cv2.bilateralFilter(self.color,5,5,3)
+       for _ in range(self.down):
+           self.color=cv2.pyrUp(self.color)   
+       self.graysc=cv2.cvtColor(self.imagen, cv2.COLOR_BGR2GRAY)
+       self.dif=cv2.medianBlur(self.graysc, 7)
+       self.bordes=cv2.adaptiveThreshold(self.dif,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,blockSize=9,C=2)
+       self.bordes=cv2.cvtColor(self.bordes, cv2.COLOR_GRAY2BGR)
+       self.imagen=cv2.bitwise_and(self.color, self.bordes)
+##############################################################################################
+  #HABILITANDO CARICATURA
+##############################################################################################     
+    def cartoon_on(self):
+       if self.cartoonflag==0:
+            self.cartoonflag=1
+       elif self.cartoonflag==1:
+           self.cartoonflag=0
+               
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 ################################################################################################
