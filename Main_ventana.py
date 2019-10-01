@@ -7,6 +7,7 @@ from tkinter import *
 from tkinter.filedialog import asksaveasfile
 from PIL import ImageTk,Image 
 from tkinter.ttk import *
+from scipy.interpolate import UnivariateSpline
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 ################################################################################################
@@ -27,6 +28,8 @@ class App:
         self.bwflag=0
         self.smoothflag=0
         self.cartoonflag=0
+        self.coldflag=0
+        self.warmflag=0
 #***********************************************************************************************
 ################################################################################################
         #APARTADO GRÁFICO/VISUAL
@@ -65,7 +68,7 @@ class App:
         self.deteccion.add_command(label="Detección de Color: NO",command=self.coloron)
         #Creando menú de mejoramiento
         self.ajustes=Menu(self.menubar, tearoff=0)
-        self.menubar.add_cascade(label="Mejoramiento", menu=self.ajustes)
+        self.menubar.add_cascade(label="Ajustar", menu=self.ajustes)
         self.ajustes.add_command(label="Contraste",command=self.contraste)
         self.ajustes.add_command(label="Suavizar",command=self.smooth)
         #Menu de color
@@ -75,6 +78,8 @@ class App:
         self.color.add_command(label="Escala de Grises",command=self.gray)
         self.color.add_command(label="Blanco y negro",command=self.bw)
         self.color.add_command(label="Caricatura",command=self.cartoon_on)
+        self.color.add_command(label="Frio",command=self.cold_on)
+        self.color.add_command(label="Calido",command=self.warm_on)
 ###############################################################################################
     #CREANDO BOTONES PARA INTERACTUAR CON LA VISUALIZACIÓN DE LA IMAGEN
 ###############################################################################################        
@@ -234,7 +239,7 @@ class App:
             if self.area>500:#ajustando un tamaño mínimo para realiza la marca del contorno
                 cv2.drawContours(self.imagen,self. contours, -1, (0,255,0),3)#realizando el contorno de color verde alrededor de los objetos de este color
 #############################################################################################
-    #FUNCION PARA ACTIVAR/DESACTIVAR DETECCIÖN FACIAL
+    #FUNCION PARA ACTIVAR/DESACTIVAR DETECCIÖN DE COLOR
 #############################################################################################              
     def coloron(self):
         if self.colorflag==0:
@@ -242,7 +247,61 @@ class App:
             self.deteccion.entryconfig(1,label="Detección de Color: SI")
         elif self.colorflag==1:
             self.colorflag=0
-            self.deteccion.entryconfig(1,label="Detección de Color: NO")                
+            self.deteccion.entryconfig(1,label="Detección de Color: NO")
+#############################################################################################
+    #COLD
+#############################################################################################
+    def cold(self):
+        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])
+        self.uplut=self.uplut(range(256))
+        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])
+        self.downlut=self.downlut(range(256))
+        self.color=self.imagen
+        self.b, self.g, self.r=cv2.split(self.color)
+        self.b=cv2.LUT(self.b,self.uplut).astype(np.uint8)
+        self.r=cv2.LUT(self.r,self.downlut).astype(np.uint8)
+        self.color=cv2.merge((self.b,self.g,self.r))
+        
+        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)
+        self.h,self.s,self.v=cv2.split(self.color)
+        self.s=cv2.LUT(self.s,self.downlut).astype(np.uint8)
+        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)
+        self.imagen= self.color
+#############################################################################################
+    #ACTIVAR FUNCION COLD
+#############################################################################################              
+    def cold_on(self):
+        if self.coldflag==0:
+            self.coldflag=1
+        elif self.coldflag==1:
+            self.coldflag=0
+#############################################################################################
+    #WARM
+#############################################################################################
+    def warm(self):
+        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])
+        self.uplut=self.uplut(range(256))
+        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])
+        self.downlut=self.downlut(range(256))
+        self.color=self.imagen
+        self.b, self.g, self.r=cv2.split(self.color)
+        self.r=cv2.LUT(self.r,self.uplut).astype(np.uint8)
+        self.b=cv2.LUT(self.b,self.downlut).astype(np.uint8)
+        self.color=cv2.merge((self.b,self.g,self.r))
+        
+        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)
+        self.h,self.s,self.v=cv2.split(self.color)
+        self.s=cv2.LUT(self.s,self.uplut).astype(np.uint8)
+        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)
+        self.imagen= self.color
+#############################################################################################
+    #ACTIVAR FUNCION WARM
+#############################################################################################              
+    def warm_on(self):
+        if self.warmflag==0:
+            self.warmflag=1
+        elif self.warmflag==1:
+            self.warmflag=0            
 ##############################################################################################
   #FUNCIÓN DE ACTUALIZACIÓN
 ##############################################################################################        
@@ -274,6 +333,12 @@ class App:
                 #........................................................................................................
             if self.cartoonflag==1:
                 self.cartoon()
+                #........................................................................................................
+            if self.coldflag==1:
+                self.cold()
+                #........................................................................................................
+            if self.warmflag==1:
+                self.warm()
             self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
             self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
             self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
