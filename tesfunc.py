@@ -1,4 +1,4 @@
-#PRUEBAS
+#PRUEBAS AQUí
 import numpy as np
 import PIL
 import cv2
@@ -162,7 +162,7 @@ class App:
         )
         #dibujando rectángulos sobre los rostros detectados
         for (x,y,w,h) in self.faces:
-            cv2.rectangle(self.imagen,(x,y),(x+w,y+h),(255,255,255),2) #definiendo rectángulo para las ROI
+            cv2.rectangle(self.imagen,(x,y),(x+w,y+h),(200,255,3),2) #definiendo rectángulo para las ROI
             self.roi_color = self.imagen[y:y+h, x:x+w] #dibujando ROI sobre la imagen BGR
 #############################################################################################
     #FUNCION PARA ACTIVAR/DESACTIVAR DETECCIÖN FACIAL
