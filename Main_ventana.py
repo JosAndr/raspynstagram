@@ -20,6 +20,7 @@ class App:
     def __init__(self, mainwin, nombre):
         self.run=0 #bandera de actualización
         self.imagen=0
+        self.imagenbup=0
         self.faceflag=0
         self.colorflag=0
         self.contrflag=0
@@ -119,6 +120,7 @@ class App:
 ##############################################################################################        
     def closecont(self):
         self.contrflag=0
+        self.imagenbup=self.imagen
         self.adjcont.destroy()
 #-----------------------------------------------------------------------------------------------------------
 ################################################################################################
@@ -130,7 +132,7 @@ class App:
         self.smth=1
         self.suavizar.title("Suavizado")
         self.suavizar.geometry("300x100+670+20")
-        self.sigsli=tk.Scale(self.suavizar,from_=1, to=15, cursor="arrow", orient=HORIZONTAL,showvalue=YES, variable=self.smth,length=300,command=self.suaval)
+        self.sigsli=tk.Scale(self.suavizar,from_=1, to=10, cursor="arrow", orient=HORIZONTAL,showvalue=NO, variable=self.smth,length=300,command=self.suaval)
         self.sigsli.set(1)
         self.sigsli.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
         self.suavizar.protocol("WM_DELETE_WINDOW", self.closesuav)
@@ -139,6 +141,7 @@ class App:
 ##############################################################################################        
     def closesuav(self):
         self.smoothflag=0
+        self.imagenbup=self.imagen
         self.suavizar.destroy()        
 #********************************************************************************************
 #############################################################################################
@@ -169,9 +172,12 @@ class App:
     def faceon(self):
         if self.faceflag==0:
             self.faceflag=1
+            self.showst()
             self.deteccion.entryconfig(0,label="Detección Facial: SI")
         elif self.faceflag==1:
             self.faceflag=0
+            self.imagen=self.imagenbup
+            self.showst()
             self.deteccion.entryconfig(0,label="Detección Facial: NO")
 #############################################################################################
          #DETECCIÖN DE COLOR
@@ -244,9 +250,12 @@ class App:
     def coloron(self):
         if self.colorflag==0:
             self.colorflag=1
+            self.showst()
             self.deteccion.entryconfig(1,label="Detección de Color: SI")
         elif self.colorflag==1:
             self.colorflag=0
+            self.imagen=self.imagenbup
+            self.showst()
             self.deteccion.entryconfig(1,label="Detección de Color: NO")
 #############################################################################################
     #COLD
@@ -273,8 +282,11 @@ class App:
     def cold_on(self):
         if self.coldflag==0:
             self.coldflag=1
+            self.showst()
         elif self.coldflag==1:
             self.coldflag=0
+            self.imagen=self.imagenbup
+            self.showst()
 #############################################################################################
     #WARM
 #############################################################################################
@@ -300,45 +312,19 @@ class App:
     def warm_on(self):
         if self.warmflag==0:
             self.warmflag=1
+            self.showst()
         elif self.warmflag==1:
-            self.warmflag=0            
+            self.warmflag=0
+            self.imagen=self.imagenbup
+            self.showst()
 ##############################################################################################
   #FUNCIÓN DE ACTUALIZACIÓN
 ##############################################################################################        
     def actualizar(self):
         ret,frame, frame1=self.VS.get_frame() #llamando la función de obtención de imagen
         self.imagen=cv2.flip(frame, 1)#invirtiendo para que la imagen coincida con la imagen real
+        self.imagenbup=self.imagen
         if ret:#si hay "frames" capturados
-            if self.faceflag==1:
-                self.detc_facial()
-                #..............................................................
-            if self.colorflag==1:
-                self.detc_color()
-                #..............................................................
-            if self.contrflag==1:
-                self.conts(1)
-                #..............................................................
-            if  self.smoothflag==1:
-                self.suaval(1)
-                #.............................................................
-            if self.invflag==1:
-                self.imagen=cv2.bitwise_not(self.imagen)
-                #.............................................................
-            if self.grayflag==1:
-                self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
-                #.............................................................
-            if self.bwflag==1:
-                self.grisesc=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY).astype('uint8')
-                self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
-                #........................................................................................................
-            if self.cartoonflag==1:
-                self.cartoon()
-                #........................................................................................................
-            if self.coldflag==1:
-                self.cold()
-                #........................................................................................................
-            if self.warmflag==1:
-                self.warm()
             self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
             self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
             self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
@@ -346,11 +332,10 @@ class App:
             self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
 
         if self.run==0:#modo por defecto:visualización de video
-            self.lmain.after(1,self.actualizar)#reiniciando la función despues de 1 ms
+            self.lmain.after(1,self.actualizar)#reiniciando la función 
             
         if self.run==1:#modo forzado:imagen estática
-            pass
-           
+           self.showst()
 ##############################################################################################
    #FUNCIONES PARA EL CAMBIO DE MODO ACTUALIZACIÓN
 ##############################################################################################   
@@ -358,7 +343,37 @@ class App:
       self.run=1 #cambiando el valor de la bandera
     def reint(self):#Modo video
       self.run=0#reiniciando el valor del a bandera
-      self.actualizar()#ejecutando la función de actulización para refrescar el valor de la bandera
+      self.actualizar()
+    def showst(self): #modo estático
+        if self.faceflag==1:
+           self.detc_facial()
+            #..............................................................
+        if self.colorflag==1:
+            self.detc_color()
+            #..............................................................
+        if self.invflag==1:
+            self.imagen=cv2.bitwise_not(self.imagen)
+            #.............................................................
+        if self.grayflag==1:
+            self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
+            #.............................................................
+        if self.bwflag==1:
+            self.grisesc=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY).astype('uint8')
+            self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+            #........................................................................................................
+        if self.cartoonflag==1:
+            self.cartoon()
+            #........................................................................................................
+        if self.coldflag==1:
+            self.cold()
+            #........................................................................................................
+        if self.warmflag==1:
+            self.warm()
+        self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
+        self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
+        self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
+        self.lmain.configure(image=self.imgtk)#definiendo fuente de la imagen del lienzo
+        self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
 ##############################################################################################
    #FUNCIÓN PARA SALIR
 ##############################################################################################        
@@ -384,44 +399,56 @@ class App:
    #FUNCIÓN PARA AJUSTAR EL CONTRASTE
 ##############################################################################################     
     def conts(self,gamma):
+        self.imagen=self.imagenbup
         self.gamma=self.slider.get()
         self.invgamma=1/self.gamma
         self.table=np.array([((self.i / 255.0) ** self.invgamma) * 255
 		for self.i in np.arange(0, 256)]).astype("uint8")
         self.imagen=cv2.LUT(self.imagen,self.table)
+        self.showst()
 ##############################################################################################
    #FUNCIÓN PARA SUAVIZAR
 ##############################################################################################     
     def suaval(self,sigma):
+        self.imagen=self.imagenbup
         self.scolor=self.imagen
         self.iter=self.sigsli.get()
-        for _ in range(self.iter):
-            self.scolor=cv2.bilateralFilter(self.scolor,3,3,1)
+        self.scolor=cv2.bilateralFilter(self.scolor,self.iter,3*self.iter,3*self.iter)
         self.imagen=self.scolor
+        self.showst()
 ##############################################################################################
    #INVERTIR COLOR
 ##############################################################################################     
     def inv(self):
         if self.invflag==0:
             self.invflag=1
+            self.showst()
         elif self.invflag==1:
             self.invflag=0
+            self.imagen=self.imagenbup
+            self.showst()
 ##############################################################################################
   #ESCALA DE GRISES
 ##############################################################################################     
     def gray(self):
         if self.grayflag==0:
             self.grayflag=1
+            self.showst()
         elif self.grayflag==1:
             self.grayflag=0
+            self.imagen=self.imagenbup
+            self.showst()
 ##############################################################################################
   #B&W
 ##############################################################################################     
     def bw(self):
         if self.bwflag==0:
             self.bwflag=1
+            self.showst()
         elif self.bwflag==1:
             self.bwflag=0
+            self.imagen=self.imagenbup
+            self.showst()
 ##############################################################################################
   #CARICATURA
 ##############################################################################################     
@@ -446,8 +473,11 @@ class App:
     def cartoon_on(self):
        if self.cartoonflag==0:
             self.cartoonflag=1
+            self.showst()
        elif self.cartoonflag==1:
            self.cartoonflag=0
+           self.imagen=self.imagenbup
+           self.showst()
                
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
