@@ -7,7 +7,10 @@ from tkinter import *
 from tkinter.filedialog import asksaveasfile
 from PIL import ImageTk,Image 
 from tkinter.ttk import *
+from math import *
 from scipy.interpolate import UnivariateSpline
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.figure import Figure
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 ################################################################################################
@@ -31,6 +34,7 @@ class App:
         self.cartoonflag=0
         self.coldflag=0
         self.warmflag=0
+        self.filtflag=0
 #***********************************************************************************************
 ################################################################################################
         #APARTADO GRÁFICO/VISUAL
@@ -63,10 +67,10 @@ class App:
         self.archivo.add_separator()#agregando separador
         self.archivo.add_command(label="Salir", command=self.salir)#agregando botón para salir de la GUI
         #Menu de detección
-        self.deteccion=Menu(self.menubar, tearoff=0)
+        self.deteccion=Menu(self.menubar, tearoff=0) 
         self.menubar.add_cascade(label="Detección", menu=self.deteccion)
-        self.deteccion.add_command(label="Detección Facial: NO",command=self.faceon)
-        self.deteccion.add_command(label="Detección de Color: NO",command=self.coloron)
+        self.deteccion.add_command(label="Detección Facial",command=self.faceon)
+        self.deteccion.add_command(label="Detección de Color",command=self.coloron)
         #Creando menú de mejoramiento
         self.ajustes=Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Ajustar", menu=self.ajustes)
@@ -81,26 +85,34 @@ class App:
         self.color.add_command(label="Caricatura",command=self.cartoon_on)
         self.color.add_command(label="Frio",command=self.cold_on)
         self.color.add_command(label="Calido",command=self.warm_on)
+        #Menu de filtros
+        self.filtros=Menu(self.menubar,tearoff=0)
+        self.menubar.add_cascade(label="Filtros", menu=self.filtros)
+        self.filtros.add_command(label="Espectro",command=self.espectrum)
+        self.filtros.add_command(label="Pasa Bajos",command=self.lpf)
+        self.filtros.add_command(label="Pasa Altos",command=self.hpf)
+        self.filtros.add_command(label="Pasa Banda",command=self.bpf)
+        self.filtros.add_command(label="Rechaza Banda",command=self.rpf)
 ###############################################################################################
     #CREANDO BOTONES PARA INTERACTUAR CON LA VISUALIZACIÓN DE LA IMAGEN
 ###############################################################################################        
         #creando botón de reintentar
-        ret=tk.Button(mainwin, text='TOMAR DE NUEVO', command=self.reint)#Creando botón para reintentar la captura de la fotografía, como comando llama a la función reint()
-        ret.pack(side="bottom", fill="x", expand="yes",padx=4, pady=6)#Posición del botón
+        self.ret=tk.Button(mainwin, text='TOMAR DE NUEVO', command=self.reint)#Creando botón para reintentar la captura de la fotografía, como comando llama a la función reint()
+        self.ret.pack(side="bottom", fill="x", expand="yes",padx=4, pady=6)#Posición del botón
         #creando boton de captura
         self.snap=tk.Button(mainwin, text='¡FOTO!', command=self.capture)#Creando botón para realizar la captura de la fotografía, como comando llama a la función capture()
         self.snap.pack(side="bottom", fill="x", expand="yes",padx=4, pady=6)#Posición del botón
 ##############################################################################################
     #CREANDO LIENZO DE VISUALIZACIÓN
 ##############################################################################################
-        self.lmain = tk.Label(master=mainwin)
-        self.lmain.pack(side='left',padx=4, pady=3)        
+        self.lmain = tk.Label(master=mainwin) #label de visualización
+        self.lmain.pack(side='left',padx=4, pady=3) #posición del label     
 ##############################################################################################
    #LLAMANDO ACTUALIZACIÓN DE LA IMAGEN
 ##############################################################################################
-        time.sleep(2.0)
-        self.actualizar()
-        self.mainwin.mainloop()
+        time.sleep(2.0)#tiempo de espera para el obturador
+        self.actualizar()#llamando función de actulización
+        self.mainwin.mainloop() #inicializando GUI
 #-----------------------------------------------------------------------------------------------------------
 ################################################################################################
     #VENTANA DE CONTRASTE
@@ -142,7 +154,51 @@ class App:
     def closesuav(self):
         self.smoothflag=0
         self.imagenbup=self.imagen
-        self.suavizar.destroy()        
+        self.suavizar.destroy()
+##############################################################################################
+   #VENTANA DE FILTROS
+##############################################################################################
+    def espectrum(self):
+        self.filtflag=0
+        self.frec=tk.Toplevel(self.mainwin)
+        self.frec.title("Frecuencia R")
+        self.frec.geometry("360x450+670+20")
+        self.hp=tk.Button(self.frec, text='ROJO',command=self.rf)
+        self.hp.pack(side="bottom", fill="x", expand="yes",padx=4, pady=1)
+        self.lp=tk.Button(self.frec, text='VERDE',command=self.gf)
+        self.lp.pack(side="bottom", fill="x", expand="yes",padx=4, pady=1)
+        self.color=tk.Button(self.frec, text='AZUL',command=self.bf)
+        self.color.pack(side="bottom", fill="x", expand="yes",padx=4, pady=1)
+        #------------------------------------------------------------------------------------------
+        self.b,self.g,self.r=cv2.split(self.imagen)#separar image en canales
+        self.dtfsR=np.fft.fftshift(cv2.dft(np.float32(self.r),flags = cv2.DFT_COMPLEX_OUTPUT))#transformada de Fourier del canal rojo
+        self.Rcomplex= self.dtfsR[:,:,0] + 1j* self.dtfsR[:,:,1]#valores complejos de transformada de Fourier
+        self.Rabs=np.abs(self.Rcomplex) + 1 #magnitud de los valores de la transformada de Fourier del canal rojo
+        self.Rumb=20 * np.log(self.Rabs)#umbralización de los valores de la transformada
+        self.rspec=255 * self.Rumb / np.max(self.Rumb) #normalizando de 0 a 255
+        self.rspec= self.rspec.astype(np.uint8)#convirtiendo a uint8 para permitir la visualización
+        #------------------------------------------------------------------------------------------
+        self.Vspect = tk.Label(master=self.frec)
+        self.Vspect.pack(side='left',padx=4, pady=3)
+        self.imgspect=Image.fromarray(self.rspec)
+        self.specttk = ImageTk.PhotoImage(image=self.imgspect)#convirtiendo la imagen a formato de fotografía
+        self.Vspect.configure(image=self.specttk)#definiendo fuente de la imagen del lienzo
+        self.Vspect.image=self.specttk
+    def filtslide(self):
+        self.filtwin=tk.Toplevel(self.mainwin)
+        self.sigmaf=DoubleVar()
+        self.centf=DoubleVar()
+        self.filtwin.title("Frecuencia y Radio")
+        self.filtwin.geometry("300x200+670+20")
+        self.sigmsli=tk.Scale(self.filtwin,from_=1, to=100, cursor="arrow", orient=HORIZONTAL,resolution=0.001,showvalue=YES, variable=self.sigmaf,length=300,command=self.filt)
+        self.sigmsli.set(3)
+        self.sigmsli.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
+        self.frec=tk.Scale(self.filtwin,from_=1, to=100, cursor="arrow", orient=HORIZONTAL,resolution=0.001,showvalue=YES, variable=self.centf,length=300)
+        self.frec.set(3)
+        self.frec.pack(side="bottom",fill="x",expand="yes",padx=4, pady=6)
+        self.filtwin.protocol("WM_DELETE_WINDOW", self.filtclose)
+    def filtclose(self):
+        self.filtwin.destroy()
 #********************************************************************************************
 #############################################################################################
     #CALLBACKS Y FUCIONES
@@ -153,7 +209,7 @@ class App:
     #DETECCIÖN FACIAL
 #############################################################################################   
     def detc_facial(self):
-        self.face_det=cv2.CascadeClassifier('/usr/share/opencv/lbpcascades/lbpcascade_frontalface.xml')#clasificador pre-entrenado de reconcoimeinto facial
+        self.face_det=cv2.CascadeClassifier('/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml')#clasificador pre-entrenado de reconcoimeinto facial
         self.imnoroi=cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB
         self.gris=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
         self.faces = self.face_det.detectMultiScale( #función de detección 
@@ -173,12 +229,10 @@ class App:
         if self.faceflag==0:
             self.faceflag=1
             self.showst()
-            self.deteccion.entryconfig(0,label="Detección Facial: SI")
         elif self.faceflag==1:
             self.faceflag=0
             self.imagen=self.imagenbup
             self.showst()
-            self.deteccion.entryconfig(0,label="Detección Facial: NO")
 #############################################################################################
          #DETECCIÖN DE COLOR
 #############################################################################################
@@ -251,30 +305,28 @@ class App:
         if self.colorflag==0:
             self.colorflag=1
             self.showst()
-            self.deteccion.entryconfig(1,label="Detección de Color: SI")
         elif self.colorflag==1:
             self.colorflag=0
             self.imagen=self.imagenbup
             self.showst()
-            self.deteccion.entryconfig(1,label="Detección de Color: NO")
 #############################################################################################
     #COLD
 #############################################################################################
     def cold(self):
-        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])
-        self.uplut=self.uplut(range(256))
-        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])
-        self.downlut=self.downlut(range(256))
+        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])#Generando un spline de intercambio de valores ascendente
+        self.uplut=self.uplut(range(256))#LookUpTable con los valores modificados
+        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])#Generando un spline de intercambio de valores descendente
+        self.downlut=self.downlut(range(256))#LookUpTable con los valores modificados
         self.color=self.imagen
-        self.b, self.g, self.r=cv2.split(self.color)
-        self.b=cv2.LUT(self.b,self.uplut).astype(np.uint8)
-        self.r=cv2.LUT(self.r,self.downlut).astype(np.uint8)
-        self.color=cv2.merge((self.b,self.g,self.r))
+        self.b, self.g, self.r=cv2.split(self.color)#separando la imagen en canales bgr
+        self.b=cv2.LUT(self.b,self.uplut).astype(np.uint8) #aplicando LUT de valores ascendentes al color azul
+        self.r=cv2.LUT(self.r,self.downlut).astype(np.uint8)#aplicando LUT de valores descendentes al color rojo
+        self.color=cv2.merge((self.b,self.g,self.r))#reagrupando los canales en bgr
         
-        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)
-        self.h,self.s,self.v=cv2.split(self.color)
-        self.s=cv2.LUT(self.s,self.downlut).astype(np.uint8)
-        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)
+        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)#convirtiendo a hsv
+        self.h,self.s,self.v=cv2.split(self.color)#separando imagen en sus valores hsv
+        self.s=cv2.LUT(self.s,self.downlut).astype(np.uint8)#aplicando LUT descendente al valor de saturación
+        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)#reagrupando los canales en hsv
         self.imagen= self.color
 #############################################################################################
     #ACTIVAR FUNCION COLD
@@ -282,6 +334,7 @@ class App:
     def cold_on(self):
         if self.coldflag==0:
             self.coldflag=1
+            self.imagen=self.imagenbup
             self.showst()
         elif self.coldflag==1:
             self.coldflag=0
@@ -291,20 +344,20 @@ class App:
     #WARM
 #############################################################################################
     def warm(self):
-        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])
-        self.uplut=self.uplut(range(256))
-        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])
-        self.downlut=self.downlut(range(256))
+        self.uplut= UnivariateSpline([0, 64, 128, 192, 256],[0, 70, 140, 210, 256])#Generando un spline de intercambio de valores ascendente
+        self.uplut=self.uplut(range(256))#LookUpTable con los valores modificados
+        self.downlut=UnivariateSpline([0, 64, 128, 192, 256],[0, 30,  80, 120, 192])#Generando un spline de intercambio de valores descendente
+        self.downlut=self.downlut(range(256))#LookUpTable con los valores modificados
         self.color=self.imagen
-        self.b, self.g, self.r=cv2.split(self.color)
-        self.r=cv2.LUT(self.r,self.uplut).astype(np.uint8)
-        self.b=cv2.LUT(self.b,self.downlut).astype(np.uint8)
-        self.color=cv2.merge((self.b,self.g,self.r))
+        self.b, self.g, self.r=cv2.split(self.color)#separando la imagen en canales bgr
+        self.r=cv2.LUT(self.r,self.uplut).astype(np.uint8)#aplicando LUT de valores ascendentes al color rojo
+        self.b=cv2.LUT(self.b,self.downlut).astype(np.uint8)#aplicando LUT de valores descendentes al color azul
+        self.color=cv2.merge((self.b,self.g,self.r))#reagrupando los canales en bgr
         
-        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)
-        self.h,self.s,self.v=cv2.split(self.color)
-        self.s=cv2.LUT(self.s,self.uplut).astype(np.uint8)
-        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)
+        self.color=cv2.cvtColor(self.color, cv2.COLOR_BGR2HSV)#convirtiendo a hsv
+        self.h,self.s,self.v=cv2.split(self.color)#separando imagen en sus valores hsv
+        self.s=cv2.LUT(self.s,self.uplut).astype(np.uint8)#aplicando LUT descendente al valor de saturación
+        self.color=cv2.cvtColor(cv2.merge((self.h,self.s,self.v)), cv2.COLOR_HSV2BGR)#reagrupando los canales en hsv
         self.imagen= self.color
 #############################################################################################
     #ACTIVAR FUNCION WARM
@@ -323,16 +376,26 @@ class App:
     def actualizar(self):
         ret,frame, frame1=self.VS.get_frame() #llamando la función de obtención de imagen
         self.imagen=cv2.flip(frame, 1)#invirtiendo para que la imagen coincida con la imagen real
+        #reiniciando valores de las banderas
         self.imagenbup=self.imagen
+        self.faceflag=0
+        self.colorflag=0
+        self.contrflag=0
+        self.invflag=0
+        self.grayflag=0
+        self.bwflag=0
+        self.smoothflag=0
+        self.cartoonflag=0
+        self.coldflag=0
+        self.warmflag=0
         if ret:#si hay "frames" capturados
             self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
             self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
             self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
             self.lmain.configure(image=self.imgtk)#definiendo fuente de la imagen del lienzo
             self.lmain.image=self.imgtk#mostrando la imagen en el lienzo
-
         if self.run==0:#modo por defecto:visualización de video
-            self.lmain.after(1,self.actualizar)#reiniciando la función 
+           self.lmain.after(1,self.actualizar)#reiniciando la función 
             
         if self.run==1:#modo forzado:imagen estática
            self.showst()
@@ -352,14 +415,14 @@ class App:
             self.detc_color()
             #..............................................................
         if self.invflag==1:
-            self.imagen=cv2.bitwise_not(self.imagen)
+            self.imagen=cv2.bitwise_not(self.imagen)#función de inversión de la imagen
             #.............................................................
         if self.grayflag==1:
-            self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)
+            self.imagen=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY)#conversión a escala de grises
             #.............................................................
         if self.bwflag==1:
             self.grisesc=cv2.cvtColor(self.imagen,cv2.COLOR_BGR2GRAY).astype('uint8')
-            self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+            self.imagen = cv2.adaptiveThreshold(self.grisesc,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)#umbralización adaptativa
             #........................................................................................................
         if self.cartoonflag==1:
             self.cartoon()
@@ -400,11 +463,16 @@ class App:
 ##############################################################################################     
     def conts(self,gamma):
         self.imagen=self.imagenbup
-        self.gamma=self.slider.get()
-        self.invgamma=1/self.gamma
-        self.table=np.array([((self.i / 255.0) ** self.invgamma) * 255
+        self.bg,self.gg,self.rg=cv2.split(self.imagen) #obteniendo los canales bgr
+        self.gamma=self.slider.get()#obteniendo el valor del slider de la gamma
+        self.invgamma=1/self.gamma #generando el valor de gamma inversa
+        self.table=np.array([((self.i / 255.0) ** self.invgamma) * 255 #generando LUT con el valor de gamma inversa 
 		for self.i in np.arange(0, 256)]).astype("uint8")
-        self.imagen=cv2.LUT(self.imagen,self.table)
+        #aplicando la LUT con los valors de gamma inversa a cada canal
+        self.bg=cv2.LUT(self.bg,self.table)
+        self.gg=cv2.LUT(self.gg,self.table)
+        self.rg=cv2.LUT(self.rg,self.table)
+        self.imagen=cv2.merge([self.bg,self.gg,self.rg])#reagrupando los canales bgr
         self.showst()
 ##############################################################################################
    #FUNCIÓN PARA SUAVIZAR
@@ -412,8 +480,8 @@ class App:
     def suaval(self,sigma):
         self.imagen=self.imagenbup
         self.scolor=self.imagen
-        self.iter=self.sigsli.get()
-        self.scolor=cv2.bilateralFilter(self.scolor,self.iter,3*self.iter,3*self.iter)
+        self.iter=self.sigsli.get()#obteniendo el valor del slider de suavizado
+        self.scolor=cv2.bilateralFilter(self.scolor,self.iter,3*self.iter,3*self.iter)#aplicando suavizado bilateral
         self.imagen=self.scolor
         self.showst()
 ##############################################################################################
@@ -454,19 +522,19 @@ class App:
 ##############################################################################################     
     def cartoon(self):
        self.color=self.imagen
-       self.down=2
-       self.bildif=7
+       self.down=2 #bandera para reduccion de tamaño
+       self.bildif=7#valor de aplicación de filtro bilateral
        for _ in range(self.down):
-           self.color=cv2.pyrDown(self.color)
+           self.color=cv2.pyrDown(self.color)#aplicación de disminución de tamaño
        for _ in range(self.bildif):
-           self.color=cv2.bilateralFilter(self.color,5,5,3)
+           self.color=cv2.bilateralFilter(self.color,5,5,3)#aplicación del filtro bilateral
        for _ in range(self.down):
-           self.color=cv2.pyrUp(self.color)   
-       self.graysc=cv2.cvtColor(self.imagen, cv2.COLOR_BGR2GRAY)
-       self.dif=cv2.medianBlur(self.graysc, 7)
-       self.bordes=cv2.adaptiveThreshold(self.dif,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,blockSize=9,C=2)
-       self.bordes=cv2.cvtColor(self.bordes, cv2.COLOR_GRAY2BGR)
-       self.imagen=cv2.bitwise_and(self.color, self.bordes)
+           self.color=cv2.pyrUp(self.color)  #regresando al valor original 
+       self.graysc=cv2.cvtColor(self.imagen, cv2.COLOR_BGR2GRAY) #convirtiendo a escala de grises
+       self.dif=cv2.medianBlur(self.graysc, 7) #aplicando filtro de media
+       self.bordes=cv2.adaptiveThreshold(self.dif,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,blockSize=9,C=2)#obteniendo bordes por umbralización adaptativa
+       self.bordes=cv2.cvtColor(self.bordes, cv2.COLOR_GRAY2BGR)#convirtiendo de gris a bgr
+       self.imagen=cv2.bitwise_and(self.color, self.bordes)#realizando función and con los bordes y la imagen suavizada
 ##############################################################################################
   #HABILITANDO CARICATURA
 ##############################################################################################     
@@ -478,7 +546,128 @@ class App:
            self.cartoonflag=0
            self.imagen=self.imagenbup
            self.showst()
-               
+##############################################################################################
+  #FILTROS DE FRECUENCIA
+##############################################################################################   
+    def rf(self):
+        self.frec.title("Frecuencia R")
+        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.dtfsR=np.fft.fftshift(cv2.dft(np.float32(self.r),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal rojo
+        self.Rcomplex= self.dtfsR[:,:,0] + 1j* self.dtfsR[:,:,1]#valores complejos de la dft
+        self.Rabs=np.abs(self.Rcomplex) + 1#magnitud de los valores de la dft
+        self.Rumb=20 * np.log(self.Rabs)#umbralización de los valores de la dft
+        self.rspec=255 * self.Rumb / np.max(self.Rumb)#normalización de los valores entre 0 y 255
+        self.rspec= self.rspec.astype(np.uint8)#conversión a uint8
+        #-----------------------------------------------------------------------------------------
+        self.Rimgspect=Image.fromarray(self.rspec)
+        self.Rspecttk = ImageTk.PhotoImage(image=self.Rimgspect)#convirtiendo la imagen a formato de fotografía
+        self.Vspect.configure(image=self.Rspecttk)#definiendo fuente de la imagen del lienzo
+        self.Vspect.image=self.Rspecttk
+    def gf(self):
+        self.frec.title("Frecuencia G")
+        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.dtfsG=np.fft.fftshift(cv2.dft(np.float32(self.g),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal verde
+        self.Gcomplex= self.dtfsG[:,:,0] + 1j* self.dtfsG[:,:,1]#valores complejos de la dft
+        self.Gabs=np.abs(self.Gcomplex) + 1#magnitud de los valores de la dft
+        self.Gumb=20 * np.log(self.Gabs)#umbralización de los valores de la dft
+        self.gspec=255 * self.Gumb/ np.max(self.Gumb)#normalización de los valores entre 0 y 255
+        self.gspec= self.gspec.astype(np.uint8)#conversión a uint8
+        #------------------------------------------------------------------------------------------
+        self.Gimgspect=Image.fromarray(self.gspec)
+        self.Gspecttk = ImageTk.PhotoImage(image=self.Gimgspect)#convirtiendo la imagen a formato de fotografía
+        self.Vspect.configure(image=self.Gspecttk)#definiendo fuente de la imagen del lienzo
+        self.Vspect.image=self.Gspecttk
+    def bf(self):
+        self.frec.title("Frecuencia B")
+        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.dtfsB=np.fft.fftshift(cv2.dft(np.float32(self.b),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal azul
+        self.Bcomplex= self.dtfsB[:,:,0] + 1j* self.dtfsB[:,:,1]#valores complejos de la dft
+        self.Babs=np.abs(self.Bcomplex) + 1#magnitud de los valores de la dft
+        self.Bumb=20 * np.log(self.Babs)#umbralización de los valores de la dft
+        self.bspec=255 * self.Bumb/ np.max(self.Bumb)#normalización de los valores entre 0 y 255
+        self.bspec= self.bspec.astype(np.uint8)#conversión a uint8
+        #------------------------------------------------------------------------------------------
+        self.Bimgspect=Image.fromarray(self.bspec)
+        self.Bspecttk = ImageTk.PhotoImage(image=self.Bimgspect)#convirtiendo la imagen a formato de fotografía
+        self.Vspect.configure(image=self.Bspecttk)#definiendo fuente de la imagen del lienzo
+        self.Vspect.image=self.Bspecttk
+    def lpf(self):
+        self.filtsel=1
+        self.filtopt()
+    def hpf(self):
+        self.filtsel=2
+        self.filtopt()
+    def bpf(self):
+        self.filtsel=3
+        self.filtopt()
+    def rpf(self):
+        self.filtsel=4
+        self.filtopt()
+    def filtopt(self):
+        self.imagen=self.imagenbup
+        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.rows,self.cols=self.r.shape#obteniendo tamaño de la imagen
+        self.imrad=sqrt((self.rows*self.cols)/(2*pi))#radio de la imagen 
+        self.dtfR=cv2.dft(np.float32(self.r),flags = cv2.DFT_COMPLEX_OUTPUT)#dft sobre el canal rojo
+        self.dtfG=cv2.dft(np.float32(self.g),flags = cv2.DFT_COMPLEX_OUTPUT)#dft sobre el canal verde
+        self.dtfB=cv2.dft(np.float32(self.b),flags = cv2.DFT_COMPLEX_OUTPUT)#dft sobre el canal azul
+        if self.filtsel==1:
+            self.filtslide()
+        if self.filtsel==2:
+            self.filtslide()
+        if self.filtsel==3:
+            self.filtslide()
+        if self.filtsel==4:
+            self.filtslide()  
+    def filt(self,radlp):
+         self.radlp=self.sigmsli.get()#obteniendo el valor del filtro del slider
+         self.rads=(self.radlp/100)*(self.imrad)#calculando la equivlanecia en porcentaje del radio del filtro
+         self.u=np.arange(0,self.rows) #arreglo desde 0 hasta el valor de las filas
+         self.v=np.arange(0,self.cols) #arreglo desde 0 hasta el valor de las columnas
+         self.idx=np.where(self.u > self.rows/2)#obteniendo valores que sean mayores a la mitad de las filas
+         self.idy=np.where(self.v > self.cols/2)#obteniendo valores que sean mayores a la mitad de las columnas
+         self.u[self.idx]=self.u[self.idx]-self.rows#cambiando los valores en el índice de filas
+         self.v[self.idy]=self.v[self.idy]-self.cols#cambiando los valores en el índice de columnas
+         self.VF,self.UF=np.meshgrid(self.v,self.u)#creando malla con los valores de filas y columnas nuevos
+         self.dist=np.sqrt(self.VF*self.VF+self.UF*self.UF)#caculando las distancias entre pixeles
+         if self.filtsel==1:
+             self.ham2d=np.exp(-(self.dist**2)/(2*(self.rads**2)))#creando ventana de Gauss pasabajas
+         if self.filtsel==2:
+             self.ham2d=1-np.exp(-(self.dist**2)/(2*(self.rads**2)))#creando ventana de Gauss pasaaltas
+         if self.filtsel==3:
+             eps = np.finfo(float).eps
+             self.central=(self.frec.get()/100)*(self.imrad)
+             self.ham2d=np.exp(-(((self.dist**2)-(self.rads**2))/(self.dist*self.central+eps))**2)
+         if self.filtsel==4:
+             eps = np.finfo(float).eps
+             self.central=(self.frec.get()/100)*(self.imrad)
+             self.ham2d=1-np.exp(-(((self.dist**2)-(self.rads**2))/(self.dist*self.central+eps))**2)
+         #----------------------------------------------------------------
+         self.Rcomplex= self.dtfR[:,:,0] + 1j* self.dtfR[:,:,1]#valores complejos del canal rojo
+         self.Rfilt=self.Rcomplex*self.ham2d#multiplicando la dft del canal rojo con la ventana
+         self.Rinv=np.fft.ifft2(self.Rfilt)#realizando la idft
+         self.Rback=np.abs(self.Rinv)#magnitud de los valores de la idft
+         self.Rback-=self.Rback.min()
+         self.Rback=self.Rback*255 / self.Rback.max()#normalizando entre 0 y 255
+         self.Rback=self.Rback.astype(np.uint8)#convirtiendo a uint8
+         #----------------------------------------------------------------
+         self.Gcomplex= self.dtfG[:,:,0] + 1j* self.dtfG[:,:,1]#valores complejos del canal verde
+         self.Gfilt=self.Gcomplex*self.ham2d#multiplicando la dft del canal verde con la ventana
+         self.Ginv=np.fft.ifft2(self.Gfilt)#realizando la idft
+         self.Gback=np.abs(self.Ginv)#magnitud de los valores de la idft
+         self.Gback-=self.Gback.min()
+         self.Gback=self.Gback*255 / self.Gback.max()#normalizando entre 0 y 255
+         self.Gback=self.Gback.astype(np.uint8)#convirtiendo a uint8
+         #----------------------------------------------------------------
+         self.Bcomplex= self.dtfB[:,:,0] + 1j* self.dtfB[:,:,1]#valores complejos del canal azul
+         self.Bfilt=self.Bcomplex*self.ham2d#multiplicando la dft del canal verde con la ventana
+         self.Binv=np.fft.ifft2(self.Bfilt)#realizando la idft
+         self.Bback=np.abs(self.Binv)#magnitud de los valores de la idft
+         self.Bback-=self.Bback.min()
+         self.Bback=self.Bback*255 / self.Bback.max()#normalizando entre 0 y 255
+         self.Bback=self.Bback.astype(np.uint8)#convirtiendo a uint8
+         self.imagen=cv2.merge([self.Bback,self.Gback,self.Rback])#reagrupando canales bgr
+         self.showst()
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
 ################################################################################################
