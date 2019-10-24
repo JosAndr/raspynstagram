@@ -45,6 +45,9 @@ class App:
         self.coldflag=0
         self.warmflag=0
         self.filtflag=0
+        self.flagr=0
+        self.flagg=0
+        self.flagb=0
 #***********************************************************************************************
 ################################################################################################
         #APARTADO GRÁFICO/VISUAL
@@ -194,6 +197,14 @@ class App:
         self.specttk = ImageTk.PhotoImage(image=self.imgspect)#convirtiendo la imagen a formato de fotografía
         self.Vspect.configure(image=self.specttk)#definiendo fuente de la imagen del lienzo
         self.Vspect.image=self.specttk
+        self.frec.protocol("WM_DELETE_WINDOW", self.especlose)
+    def especlose(self):
+        self.imagen=cv2.merge([self.b,self.g,self.r])
+        self.flagr=0
+        self.flagg=0
+        self.flagb=0
+        self.showst()
+        self.frec.destroy()
     def filtslide(self):
         self.filtwin=tk.Toplevel(self.mainwin)
         self.sigmaf=DoubleVar()
@@ -386,6 +397,7 @@ class App:
     def actualizar(self):
         ret,frame, frame1=self.VS.get_frame() #llamando la función de obtención de imagen
         self.imagen=cv2.flip(frame, 1)#invirtiendo para que la imagen coincida con la imagen real
+        self.b,self.g,self.r=cv2.split(self.imagen)
         #reiniciando valores de las banderas
         self.imagenbup=self.imagen
         self.faceflag=0
@@ -442,6 +454,12 @@ class App:
             #........................................................................................................
         if self.warmflag==1:
             self.warm()
+        if self.flagr==1:
+            self.imagen=self.r
+        if self.flagg==1:
+            self.imagen=self.g
+        if self.flagb==1:
+            self.imagen=self.b
         self.cv2image = cv2.cvtColor(self.imagen, cv2.COLOR_BGR2RGBA)#convirtiendo de BGR a RGB   
         self.img = Image.fromarray(self.cv2image)#convirtiendo matriz a imagen
         self.imgtk = ImageTk.PhotoImage(image=self.img)#convirtiendo la imagen a formato de fotografía
@@ -561,7 +579,10 @@ class App:
 ##############################################################################################   
     def rf(self):
         self.frec.title("Frecuencia R")
-        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.flagr=1
+        self.flagg=0
+        self.flagb=0
+        #self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
         self.dtfsR=np.fft.fftshift(cv2.dft(np.float32(self.r),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal rojo
         self.Rcomplex= self.dtfsR[:,:,0] + 1j* self.dtfsR[:,:,1]#valores complejos de la dft
         self.Rabs=np.abs(self.Rcomplex) + 1#magnitud de los valores de la dft
@@ -573,9 +594,13 @@ class App:
         self.Rspecttk = ImageTk.PhotoImage(image=self.Rimgspect)#convirtiendo la imagen a formato de fotografía
         self.Vspect.configure(image=self.Rspecttk)#definiendo fuente de la imagen del lienzo
         self.Vspect.image=self.Rspecttk
+        self.showst()
     def gf(self):
         self.frec.title("Frecuencia G")
-        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.flagg=1
+        self.flagr=0
+        self.flagb=0
+        #self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
         self.dtfsG=np.fft.fftshift(cv2.dft(np.float32(self.g),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal verde
         self.Gcomplex= self.dtfsG[:,:,0] + 1j* self.dtfsG[:,:,1]#valores complejos de la dft
         self.Gabs=np.abs(self.Gcomplex) + 1#magnitud de los valores de la dft
@@ -587,9 +612,13 @@ class App:
         self.Gspecttk = ImageTk.PhotoImage(image=self.Gimgspect)#convirtiendo la imagen a formato de fotografía
         self.Vspect.configure(image=self.Gspecttk)#definiendo fuente de la imagen del lienzo
         self.Vspect.image=self.Gspecttk
+        self.showst()
     def bf(self):
         self.frec.title("Frecuencia B")
-        self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
+        self.flagb=1
+        self.flagg=0
+        self.flagr=0
+        #self.b,self.g,self.r=cv2.split(self.imagen)# seprando canales  bgr
         self.dtfsB=np.fft.fftshift(cv2.dft(np.float32(self.b),flags = cv2.DFT_COMPLEX_OUTPUT))#dft sobre el canal azul
         self.Bcomplex= self.dtfsB[:,:,0] + 1j* self.dtfsB[:,:,1]#valores complejos de la dft
         self.Babs=np.abs(self.Bcomplex) + 1#magnitud de los valores de la dft
@@ -601,6 +630,7 @@ class App:
         self.Bspecttk = ImageTk.PhotoImage(image=self.Bimgspect)#convirtiendo la imagen a formato de fotografía
         self.Vspect.configure(image=self.Bspecttk)#definiendo fuente de la imagen del lienzo
         self.Vspect.image=self.Bspecttk
+        self.showst()
     def lpf(self):
         self.filtsel=1
         self.filtopt()
